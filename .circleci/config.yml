@@ -2,41 +2,61 @@ version: 2.1
 
 jobs:
   ubuntu-rdp-setup:
-    docker:
-      - image: cimg/base:stable
+    machine:
+      image: ubuntu-2204:2023.10.1
     resource_class: medium
     steps:
       - checkout
+      
       - run:
           name: Install xrdp and XFCE Desktop
           command: |
             sudo apt-get update
             sudo apt-get install -y xrdp xfce4 xfce4-goodies
-            # User circleci sudah ada secara default, langsung set password
             echo "circleci:p@ssw0rd!" | sudo chpasswd
             sudo usermod -aG ssl-cert circleci
-            echo xfce4-session > ~/.xsession
-            sudo systemctl enable xrdp || true
-            sudo systemctl start xrdp || true
-
+            echo "xfce4-session" > /home/circleci/.xsession
+            sudo chmod +x /home/circleci/.xsession
+            
       - run:
-          name: Download and Install Playit for Linux AMD64
+          name: Start XRDP Service
+          command: |
+            sudo systemctl enable xrdp
+            sudo systemctl start xrdp
+            sudo systemctl status xrdp
+            
+      - run:
+          name: Download Playit Agent
           command: |
             wget -O playit-agent "https://github.com/playit-cloud/playit-agent/releases/download/v0.16.3-hack/playit-linux-amd64"
             chmod +x playit-agent
-
+            
       - run:
-          name: Start Playit Agent (example secret, ganti sesuai kebutuhan)
+          name: Start Playit Agent and Keep Alive
+          no_output_timeout: 60m
           command: |
+            echo "Starting Playit Agent..."
             ./playit-agent --secret 0a689350bfc031d0727bb6b7599b2a3cc128df5f777c432c68caeba76eb64d95 &
-
-      - run:
-          name: Keep Job Alive for RDP Experiment
-          command: |
-            sleep 300
+            PLAYIT_PID=$!
+            echo "Playit Agent started with PID: $PLAYIT_PID"
+            
+            # Tunggu agent startup
+            sleep 15
+            
+            # Cek apakah masih jalan
+            if ps -p $PLAYIT_PID > /dev/null; then
+               echo "✓ Playit Agent is running!"
+               ps aux | grep playit
+            else
+               echo "✗ Playit Agent failed to start!"
+               exit 1
+            fi
+            
+            # Keep alive selama 50 menit (sesuaikan kebutuhan)
+            echo "Keeping session alive..."
+            sleep 3000
 
 workflows:
-  version: 2
   ubuntu-rdp-workflow:
     jobs:
       - ubuntu-rdp-setup
