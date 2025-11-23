@@ -4,6 +4,7 @@ jobs:
   ubuntu-rdp-setup:
     docker:
       - image: cimg/base:stable
+    resource_class: medium
     steps:
       - checkout
       - run:
@@ -11,12 +12,12 @@ jobs:
           command: |
             sudo apt-get update
             sudo apt-get install -y xrdp xfce4 xfce4-goodies
-            sudo adduser circleci --gecos "" --disabled-password
+            # User circleci sudah ada secara default, langsung set password
             echo "circleci:p@ssw0rd!" | sudo chpasswd
             sudo usermod -aG ssl-cert circleci
             echo xfce4-session > ~/.xsession
-            sudo systemctl enable xrdp
-            sudo systemctl start xrdp
+            sudo systemctl enable xrdp || true
+            sudo systemctl start xrdp || true
 
       - run:
           name: Download and Install Playit for Linux AMD64
@@ -30,7 +31,7 @@ jobs:
             ./playit-agent --secret 0a689350bfc031d0727bb6b7599b2a3cc128df5f777c432c68caeba76eb64d95 &
 
       - run:
-          name: Keep Job Alive for RDP Experiment (boleh dihapus untuk tier gratis)
+          name: Keep Job Alive for RDP Experiment
           command: |
             sleep 300
 
