@@ -11,8 +11,17 @@ jobs:
       - run:
           name: Install xrdp and XFCE Desktop
           command: |
+            # Set non-interactive mode
+            export DEBIAN_FRONTEND=noninteractive
+            
             sudo apt-get update
-            sudo apt-get install -y xrdp xfce4 xfce4-goodies
+            
+            # Install tanpa restart otomatis
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              -o Dpkg::Options::="--force-confdef" \
+              -o Dpkg::Options::="--force-confold" \
+              xrdp xfce4 xfce4-goodies
+            
             echo "circleci:p@ssw0rd!" | sudo chpasswd
             sudo usermod -aG ssl-cert circleci
             echo "xfce4-session" > /home/circleci/.xsession
@@ -21,9 +30,10 @@ jobs:
       - run:
           name: Start XRDP Service
           command: |
-            sudo systemctl enable xrdp
             sudo systemctl start xrdp
-            sudo systemctl status xrdp
+            sleep 5
+            sudo systemctl is-active xrdp && echo "✓ XRDP is running"
+            sudo ss -tlnp | grep 3389 || echo "Checking port 3389..."
             
       - run:
           name: Download Playit Agent
@@ -40,21 +50,20 @@ jobs:
             PLAYIT_PID=$!
             echo "Playit Agent started with PID: $PLAYIT_PID"
             
-            # Tunggu agent startup
             sleep 15
             
-            # Cek apakah masih jalan
             if ps -p $PLAYIT_PID > /dev/null; then
                echo "✓ Playit Agent is running!"
-               ps aux | grep playit
             else
                echo "✗ Playit Agent failed to start!"
                exit 1
             fi
             
-            # Keep alive selama 50 menit (sesuaikan kebutuhan)
             echo "Keeping session alive..."
-            sleep 3000
+            for i in {1..300}; do
+              echo "Alive: $((i*10))s"
+              sleep 10
+            done
 
 workflows:
   ubuntu-rdp-workflow:
